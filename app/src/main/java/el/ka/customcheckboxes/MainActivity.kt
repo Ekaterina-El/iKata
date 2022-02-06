@@ -1,16 +1,16 @@
 package el.ka.customcheckboxes
 
-import android.annotation.SuppressLint
 import android.media.AudioManager
 import android.media.MediaPlayer
-import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.widget.SeekBar
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.android.synthetic.main.activity_main.*
 
-class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener {
+class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener,
+    MediaPlayer.OnCompletionListener, SeekBar.OnSeekBarChangeListener {
     companion object {
         const val DEFAULT_PAUSED_TIME = -1
         const val SECOND = 1000
@@ -30,6 +30,7 @@ class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener {
     private var pausedTime = DEFAULT_PAUSED_TIME
     private var currentSong = 0
     private lateinit var songs: MutableList<Song>
+    private var isChangingProgress = false
 
     private lateinit var mediaPlayer: MediaPlayer
 
@@ -42,12 +43,14 @@ class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener {
         initMediaPlayer()
         initSongs()
         initBtnListeners()
+        progress_bar.setOnSeekBarChangeListener(this)
     }
 
     private fun initMediaPlayer() {
         mediaPlayer = MediaPlayer()
         mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC)
         mediaPlayer.setOnPreparedListener(this)
+        mediaPlayer.setOnCompletionListener(this)
     }
 
     private fun initBtnListeners() {
@@ -56,7 +59,12 @@ class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener {
 
         btn_toggle_play.setOnClickListener {
             changeTogglePlayIcon(ModePlaying.Toggle)
-            startPlayingSong(songs[currentSong])
+            if (mediaPlayer.isPlaying) {
+                mediaPlayer.pause()
+                pausedTime = mediaPlayer.currentTime
+            } else {
+                startPlayingSong(songs[currentSong])
+            }
         }
     }
 
@@ -80,6 +88,7 @@ class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener {
     }
 
     private fun continueSong() {
+        changeTogglePlayIcon(ModePlaying.Playing)
         mediaPlayer.seekTo((progress_bar.progress * SECOND))
         mediaPlayer.start()
     }
@@ -97,6 +106,7 @@ class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener {
     }
 
     private fun changeSong(mode: ModeChanging) {
+        progress_bar.progress = 0
         currentSong = when (mode) {
             ModeChanging.Next -> {
                 if (currentSong == songs.size - 1) 0 else currentSong + 1
@@ -142,8 +152,12 @@ class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener {
     private fun updateSeekBar() {
         runnable = Runnable {
             val progress = mediaPlayer.currentTime
-            progress_bar.progress = progress
             text_current_time.text = progress.toTime()
+
+            if (!isChangingProgress) {
+                progress_bar.progress = progress
+            }
+
             handler.postDelayed(runnable, SECOND.toLong())
         }
         handler.postDelayed(runnable, SECOND.toLong())
@@ -155,8 +169,28 @@ class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener {
 
         progress_bar.max = totalTime
     }
+
+    override fun onCompletion(p0: MediaPlayer?) {
+        changeSong(ModeChanging.Next)
+    }
+
+    // Progress bar - start
+    override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+        if (fromUser) {
+            mediaPlayer.seekTo(progress * SECOND)
+        }
+    }
+
+    override fun onStartTrackingTouch(seekBar: SeekBar) {
+        isChangingProgress = true
+    }
+
+    override fun onStopTrackingTouch(seekBar: SeekBar) {
+        isChangingProgress = false
+        continueSong()
+    }
+    // Progress bar - end
 }
 
 // TODO request permission
-// TODO set listener when seek bar changing
-// TODO play next song when current song is end
+// TODO create class for player

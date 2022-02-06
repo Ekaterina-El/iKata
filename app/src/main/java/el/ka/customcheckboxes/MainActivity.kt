@@ -1,12 +1,15 @@
 package el.ka.customcheckboxes
 
+import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.widget.SeekBar
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import kotlinx.android.synthetic.main.activity_main.*
 
 class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener,
@@ -22,6 +25,11 @@ class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener,
         enum class ModeChanging {
             Next, Previous
         }
+
+        val permissions = arrayOf(
+            android.Manifest.permission.READ_EXTERNAL_STORAGE
+        )
+        const val PERMISSIONS_CODE = 102
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -40,6 +48,53 @@ class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener,
 
         MAIN_ACTIVITY = this
 
+        checkPermissions {
+            initApp()
+        }
+    }
+
+    private fun checkPermissions(onOk: () -> Unit) {
+        val noGrantedPermissions = permissions.filter { permissions ->
+            ContextCompat.checkSelfPermission(
+                this,
+                permissions
+            ) != PackageManager.PERMISSION_GRANTED
+        }
+        if (noGrantedPermissions.isNotEmpty()) {
+            requestPermissions(noGrantedPermissions.toTypedArray(), PERMISSIONS_CODE)
+        } else {
+            onOk()
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        if (requestCode == PERMISSIONS_CODE) {
+            var noGranted = 0;
+            permissions.forEachIndexed { i, permissions ->
+                if (grantResults[i] != PackageManager.PERMISSION_GRANTED) {
+                    noGranted += 1
+                }
+            }
+            if (noGranted == 0) {
+                initApp()
+            } else {
+                Toast.makeText(
+                    this,
+                    "The application needs permissions to work",
+                    Toast.LENGTH_SHORT
+                ).show()
+                finish()
+            }
+        }
+
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    }
+
+    private fun initApp() {
         initMediaPlayer()
         initSongs()
         initBtnListeners()
@@ -192,5 +247,4 @@ class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener,
     // Progress bar - end
 }
 
-// TODO request permission
 // TODO create class for player
